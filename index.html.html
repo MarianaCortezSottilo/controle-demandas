@@ -1,0 +1,1417 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Controle de Demandas</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#F7F8FA; --surface:#FFFFFF; --surface2:#F0F2F5;
+  --border:#E2E5EA; --border2:#CDD1D8;
+  --text:#111318; --text2:#5A6070; --text3:#9099A8;
+  --blue:#2563EB; --blue-bg:#EFF4FF; --blue-text:#1D4ED8;
+  --green:#16A34A; --green-bg:#F0FDF4; --green-text:#15803D;
+  --amber:#D97706; --amber-bg:#FFFBEB; --amber-text:#B45309;
+  --red:#DC2626; --red-bg:#FEF2F2; --red-text:#B91C1C;
+  --gray:#6B7280; --gray-bg:#F3F4F6; --gray-text:#4B5563;
+  --radius:8px; --radius-lg:12px;
+  --header-h:52px;
+}
+[data-theme="dark"] {
+  --bg:#0F1117; --surface:#181C24; --surface2:#1E2330;
+  --border:#2A2F3E; --border2:#3A4050;
+  --text:#E8EAF0; --text2:#8B95A8; --text3:#565E70;
+  --blue-bg:#1A2540; --blue-text:#93B4FF;
+  --green-bg:#102218; --green-text:#6EE09A;
+  --amber-bg:#211A0A; --amber-text:#FBD26A;
+  --red-bg:#200D0D; --red-text:#F87171;
+  --gray-bg:#1A1D26; --gray-text:#9CA3AF;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;font-size:13px;background:var(--bg);color:var(--text);min-height:100vh}
+
+/* ── Header ── */
+header{
+  background:var(--surface);border-bottom:1px solid var(--border);
+  padding:0 24px;display:flex;align-items:center;justify-content:space-between;
+  height:var(--header-h);position:sticky;top:0;z-index:200;
+}
+.logo{font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px}
+.logo-dot{width:8px;height:8px;border-radius:50%;background:var(--blue)}
+.header-right{display:flex;align-items:center;gap:8px}
+
+main{max-width:1400px;margin:0 auto;padding:20px}
+
+/* ── Stats ── */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:16px}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:12px 14px}
+.stat-label{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+.stat-val{font-size:22px;font-weight:600;line-height:1}
+.stat-val.green{color:var(--green)}.stat-val.amber{color:var(--amber)}
+.stat-val.muted{color:var(--text2)}.stat-val.gray{color:var(--gray)}
+
+/* ── Controls ── */
+.controls{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.controls input[type=text]{
+  font-family:'Inter',sans-serif;font-size:13px;padding:7px 11px;
+  border:1px solid var(--border);border-radius:var(--radius);
+  background:var(--surface);color:var(--text);height:34px;outline:none;
+  width:220px;transition:border-color .15s;
+}
+.controls input[type=text]:focus{border-color:var(--blue)}
+.spacer{flex:1}.divider{width:1px;height:20px;background:var(--border)}
+
+/* ── Buttons ── */
+.btn{
+  font-family:'Inter',sans-serif;font-size:12px;font-weight:500;
+  padding:0 14px;height:34px;border:1px solid var(--border);
+  border-radius:var(--radius);background:var(--surface);color:var(--text);
+  cursor:pointer;display:inline-flex;align-items:center;gap:6px;
+  white-space:nowrap;transition:background .12s,border-color .12s;
+}
+.btn:hover{background:var(--surface2);border-color:var(--border2)}
+.btn:active{transform:scale(.98)}
+.btn.primary{background:var(--blue);color:#fff;border-color:var(--blue)}
+.btn.primary:hover{background:#1D4ED8}
+.btn.success{background:var(--green-bg);color:var(--green-text);border-color:#BBF7D0}
+.btn.danger{color:var(--red-text)}.btn.danger:hover{background:var(--red-bg);border-color:#FCA5A5}
+.btn.sm{padding:0 8px;height:26px;font-size:11px}
+label.btn{cursor:pointer}
+
+/* ── Table scroll container — key architecture ── */
+/*  The scroll wrapper must have a max-height with overflow:auto so that   */
+/*  sticky thead works correctly relative to this container, not the page. */
+.tbl-outer{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius-lg);
+  overflow:auto;
+  max-height:calc(100vh - var(--header-h) - 260px);
+  min-height:200px;
+}
+table{width:100%;border-collapse:collapse;table-layout:fixed;min-width:980px}
+
+/* ── Sticky thead ── */
+thead th{
+  position:sticky;top:0;z-index:10;
+  background:var(--surface2);
+  font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;
+  color:var(--text3);padding:0 10px;height:34px;
+  text-align:left;border-bottom:1px solid var(--border);
+  white-space:nowrap;vertical-align:middle;
+}
+thead tr.row-filters th{
+  top:34px;
+  padding:4px 6px;
+  border-bottom:2px solid var(--border2);
+  height:36px;
+}
+th.center,td.center{text-align:center}
+
+/* ── Multi-checkbox filter dropdown ── */
+.fc-wrap{position:relative;width:100%}
+.fc-btn{
+  display:flex;align-items:center;justify-content:space-between;
+  width:100%;font-family:'Inter',sans-serif;font-size:11px;color:var(--text);
+  padding:0 7px;border:1px solid var(--border);border-radius:5px;
+  background:var(--surface);outline:none;height:26px;cursor:pointer;
+  transition:border-color .15s;white-space:nowrap;overflow:hidden;
+  gap:4px;
+}
+.fc-btn:hover,.fc-btn.open{border-color:var(--blue)}
+.fc-btn-label{overflow:hidden;text-overflow:ellipsis;flex:1;text-align:left}
+.fc-btn-caret{flex-shrink:0;font-size:9px;color:var(--text3)}
+.fc-btn.active{background:var(--blue-bg);border-color:var(--blue);color:var(--blue-text)}
+.fc-btn.active .fc-btn-caret{color:var(--blue-text)}
+
+.fc-panel{
+  display:none;position:absolute;top:calc(100% + 3px);left:0;
+  min-width:160px;max-width:280px;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);box-shadow:0 4px 16px rgba(0,0,0,.12);
+  z-index:500;padding:4px 0;
+}
+.fc-panel.open{display:block}
+.fc-search{
+  display:block;width:calc(100% - 12px);margin:4px 6px 2px;
+  font-family:'Inter',sans-serif;font-size:11px;padding:4px 8px;
+  border:1px solid var(--border);border-radius:5px;
+  background:var(--surface);color:var(--text);outline:none;
+}
+.fc-search:focus{border-color:var(--blue)}
+.fc-actions{
+  display:flex;gap:6px;padding:4px 8px 5px;border-bottom:1px solid var(--border);
+}
+.fc-act{
+  font-size:10px;color:var(--blue-text);cursor:pointer;background:none;border:none;
+  padding:0;font-family:'Inter',sans-serif;
+}
+.fc-act:hover{text-decoration:underline}
+.fc-list{
+  max-height:180px;overflow-y:auto;padding:2px 0;
+}
+.fc-item{
+  display:flex;align-items:center;gap:8px;
+  padding:5px 10px;cursor:pointer;font-size:12px;
+  transition:background .1s;user-select:none;
+}
+.fc-item:hover{background:var(--surface2)}
+.fc-item input[type=checkbox]{
+  width:13px;height:13px;flex-shrink:0;accent-color:var(--blue);cursor:pointer;
+}
+.fc-item-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fc-empty{padding:8px 10px;font-size:11px;color:var(--text3);text-align:center}
+
+/* ── Resizer handle ── */
+thead th{position:sticky;position:-webkit-sticky}
+.resizer{
+  position:absolute;top:0;right:0;width:5px;height:100%;
+  cursor:col-resize;user-select:none;z-index:1;
+}
+.resizer:hover,.resizer.active{background:var(--blue);opacity:.4}
+thead th.has-resizer{position:relative}
+
+/* ── Body rows ── */
+tbody tr{border-bottom:1px solid var(--border);transition:background .1s}
+tbody tr:last-child{border-bottom:none}
+td{padding:7px 10px;vertical-align:middle;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+td.wrap{white-space:normal;line-height:1.4}
+.row-demand td{background:var(--surface2);font-weight:500}
+.row-demand:hover td{filter:brightness(.97)}
+.row-sub td{background:var(--surface)}
+.row-sub td:first-child{padding-left:26px}
+.row-sub:hover td{background:var(--surface2)!important}
+
+/* Paused */
+.row-demand.paused td,.row-sub.paused td{
+  background:var(--gray-bg)!important;color:var(--gray-text)!important;opacity:.7;
+}
+
+/* ── Badges ── */
+.id-badge{
+  font-family:'JetBrains Mono',monospace;font-size:11px;
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:5px;padding:2px 6px;display:inline-block;color:var(--text2);
+}
+.row-sub .id-badge{font-size:10px;opacity:.75}
+.badge{
+  display:inline-flex;align-items:center;font-size:11px;font-weight:500;
+  padding:2px 9px;border-radius:20px;border:1px solid transparent;
+}
+.badge-done {background:#F0FDF4;color:#15803D;border-color:#BBF7D0}
+.badge-prog {background:#FEFCE8;color:#854D0E;border-color:#FDE047}
+.badge-pend {background:#F3F4F6;color:#4B5563;border-color:#D1D5DB}
+.badge-pause{background:#FFF7ED;color:#C2410C;border-color:#FED7AA}
+
+/* ── Progress bar ── */
+.pct-bar{display:flex;align-items:center;gap:6px}
+.bar-bg{flex:1;height:5px;background:var(--surface2);border-radius:3px;overflow:hidden;border:1px solid var(--border)}
+.bar-fill{height:100%;border-radius:3px;background:var(--green);transition:width .3s}
+.pct-label{font-size:11px;color:var(--text3);min-width:28px}
+.chk{width:15px;height:15px;cursor:pointer;accent-color:var(--green)}
+.pause-chk{width:15px;height:15px;cursor:pointer;accent-color:var(--gray)}
+.empty{text-align:center;padding:48px;color:var(--text3)}
+
+/* ── Modal ── */
+.overlay{
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);
+  z-index:300;align-items:center;justify-content:center;backdrop-filter:blur(2px);
+}
+.overlay.open{display:flex}
+.modal{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius-lg);padding:22px 24px;
+  width:460px;max-width:calc(100vw - 32px);max-height:calc(100vh - 40px);overflow-y:auto;
+}
+.modal h3{font-size:15px;font-weight:600;margin-bottom:16px}
+.field{margin-bottom:12px}
+.field label{display:block;font-size:11px;font-weight:500;color:var(--text2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em}
+.field input,.field select,.field textarea{
+  width:100%;font-family:'Inter',sans-serif;font-size:13px;
+  padding:8px 11px;border:1px solid var(--border);
+  border-radius:var(--radius);background:var(--surface);color:var(--text);
+  outline:none;transition:border-color .15s;
+}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--blue)}
+.field textarea{resize:vertical;min-height:68px}
+.field input.err{border-color:var(--red)}
+.field-err{font-size:11px;color:var(--red-text);margin-top:3px;display:none}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.modal-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;padding-top:16px;border-top:1px solid var(--border)}
+
+/* ── Toast ── */
+.toast{
+  position:fixed;bottom:22px;left:50%;
+  transform:translateX(-50%) translateY(8px);
+  background:var(--text);color:var(--bg);
+  font-size:12px;font-weight:500;padding:9px 16px;
+  border-radius:var(--radius);z-index:500;opacity:0;
+  transition:opacity .2s,transform .2s;pointer-events:none;white-space:nowrap;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.theme-btn{font-size:16px;padding:0 10px}
+
+/* ── Sync indicator ── */
+.sync-bar{
+  display:flex;align-items:center;gap:7px;
+  font-size:11px;font-weight:500;padding:4px 10px;
+  border-radius:20px;border:1px solid transparent;
+  transition:all .3s;white-space:nowrap;
+}
+.sync-bar.idle   {color:var(--text3);border-color:transparent;background:transparent}
+.sync-bar.saving {color:var(--amber-text);border-color:var(--amber);background:var(--amber-bg)}
+.sync-bar.saved  {color:var(--green-text);border-color:#BBF7D0;background:var(--green-bg)}
+.sync-bar.error  {color:var(--red-text);border-color:#FCA5A5;background:var(--red-bg);cursor:pointer}
+.sync-bar.conflict{color:#C2410C;border-color:#FED7AA;background:#FFF7ED;cursor:pointer}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:currentColor;flex-shrink:0}
+.sync-bar.saving .sync-dot{animation:pulse .8s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ── Conflict modal ── */
+.conflict-modal{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius-lg);padding:22px 24px;
+  width:460px;max-width:calc(100vw - 32px);
+}
+.conflict-modal h3{font-size:15px;font-weight:600;margin-bottom:8px}
+.conflict-modal p{font-size:13px;color:var(--text2);margin-bottom:16px;line-height:1.5}
+.conflict-btns{display:flex;flex-direction:column;gap:8px}
+.conflict-btn{
+  display:flex;flex-direction:column;align-items:flex-start;
+  padding:12px 14px;border-radius:var(--radius);border:1px solid var(--border);
+  background:var(--surface);cursor:pointer;text-align:left;transition:background .12s;
+  font-family:'Inter',sans-serif;
+}
+.conflict-btn:hover{background:var(--surface2)}
+.conflict-btn strong{font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px}
+.conflict-btn span{font-size:11px;color:var(--text3)}
+.tree-toggle{
+  background:none;border:none;cursor:pointer;padding:0 2px;
+  font-size:13px;color:var(--text2);line-height:1;
+  display:inline-flex;align-items:center;transition:color .1s;vertical-align:middle;
+}
+.tree-toggle:hover{color:var(--blue)}
+.tree-leaf{color:var(--border2);font-size:14px;padding:0 3px;user-select:none}
+.tree-connector{
+  font-family:'JetBrains Mono',monospace;font-size:12px;
+  color:var(--border2);padding-right:4px;user-select:none;
+}
+.row-sub td:first-child{padding-left:8px}
+@media(max-width:640px){main{padding:12px}.stats{grid-template-columns:repeat(2,1fr)}}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+
+<header>
+  <div class="logo"><div class="logo-dot"></div>Controle de Demandas</div>
+  <div class="header-right">
+    <div class="sync-bar idle" id="sync-bar" onclick="syncBarClick()">
+      <span class="sync-dot"></span>
+      <span id="sync-label">Carregando…</span>
+    </div>
+    <div class="divider"></div>
+    <button class="btn" onclick="loadFromSheets()" title="Recarregar dados do servidor">↺ Atualizar</button>
+    <div class="divider"></div>
+    <button class="btn success" onclick="exportJSON()">⬇ JSON</button>
+    <button class="btn success" onclick="exportExcel()" style="background:#E8F5E9;color:#2E7D32;border-color:#A5D6A7">⬇ Excel</button>
+    <label class="btn">⬆ JSON<input type="file" accept=".json" style="display:none" onchange="importJSON(event)"></label>
+    <label class="btn" style="background:#E8F5E9;color:#2E7D32;border-color:#A5D6A7">⬆ Excel<input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="importExcel(event)"></label>
+    <div class="divider"></div>
+    <button class="btn primary" onclick="openModal('demand')">+ Nova demanda</button>
+    <button class="btn" onclick="openModal('sub')">+ Subtópico</button>
+    <div class="divider"></div>
+    <button class="btn theme-btn" onclick="toggleTheme()" title="Tema">🌙</button>
+  </div>
+</header>
+
+<!-- Conflict resolution modal -->
+<div class="overlay" id="conflict-overlay">
+  <div class="conflict-modal">
+    <h3>⚠️ Conflito de dados</h3>
+    <p>Outra pessoa salvou alterações enquanto você trabalhava. Escolha como resolver:</p>
+    <div class="conflict-btns">
+      <button class="conflict-btn" onclick="resolveConflict('mine')">
+        <strong>Manter meus dados</strong>
+        <span>Sobrescreve o servidor com as suas alterações locais</span>
+      </button>
+      <button class="conflict-btn" onclick="resolveConflict('theirs')">
+        <strong>Carregar dados do servidor</strong>
+        <span>Descarta suas alterações locais e carrega a versão mais recente</span>
+      </button>
+      <button class="conflict-btn" onclick="resolveConflict('merge')">
+        <strong>Mesclar (recomendado)</strong>
+        <span>Mantém seus registros e adiciona os novos do servidor que não existem localmente</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<main>
+  <div class="stats" id="stats"></div>
+
+  <div class="controls">
+    <input type="text" id="search" placeholder="Buscar descrição..." oninput="render()" aria-label="Buscar por descrição">
+    <button class="btn sm" onclick="expandAll()" title="Expandir tudo">▾ Expandir tudo</button>
+    <button class="btn sm" onclick="collapseAll()" title="Recolher tudo">▸ Recolher tudo</button>
+    <span style="font-size:11px;color:var(--text3);margin-left:4px">Filtros concatenados nas colunas ↓</span>
+  </div>
+
+  <div class="tbl-outer">
+    <table id="main-table">
+      <colgroup id="colgroup"></colgroup>
+      <thead>
+        <tr class="row-labels">
+          <th class="has-resizer" data-col="0">ID</th>
+          <th class="has-resizer" data-col="1">Cliente</th>
+          <th class="has-resizer" data-col="2">Descrição</th>
+          <th class="has-resizer" data-col="3">Responsável</th>
+          <th class="has-resizer" data-col="4">Dt. Início</th>
+          <th class="has-resizer" data-col="5">Prev. Entrega</th>
+          <th class="has-resizer center" data-col="6">Horas</th>
+          <th class="has-resizer center" data-col="7" title="Checkbox de conclusão (subtópicos)">✓</th>
+          <th class="has-resizer" data-col="8">Progresso</th>
+          <th class="has-resizer" data-col="9">Status</th>
+          <th class="center" data-col="10" style="width:90px">
+            <span title="Marcar demanda como pausada">⏸ Pausar</span>
+          </th>
+          <th class="center" data-col="11">Ações</th>
+        </tr>
+        <tr class="row-filters">
+          <th><div class="fc-wrap" id="fc-id"></div></th>
+          <th><div class="fc-wrap" id="fc-cli"></div></th>
+          <th><div class="fc-wrap" id="fc-desc"></div></th>
+          <th><div class="fc-wrap" id="fc-resp"></div></th>
+          <th><div class="fc-wrap" id="fc-ini"></div></th>
+          <th><div class="fc-wrap" id="fc-prev"></div></th>
+          <th></th><th></th><th></th>
+          <th><div class="fc-wrap" id="fc-status"></div></th>
+          <th></th><th></th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+</main>
+
+<!-- Modal nova/editar demanda -->
+<div class="overlay" id="overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <h3 id="modal-title">Nova demanda</h3>
+    <div id="field-parent" class="field" style="display:none">
+      <label>Demanda pai</label>
+      <select id="f-parent" onchange="autoFillCliente()"></select>
+    </div>
+    <div class="field">
+      <label>Cliente</label>
+      <input id="f-cliente" type="text" placeholder="Nome do cliente">
+    </div>
+    <div class="field">
+      <label>Descrição *</label>
+      <textarea id="f-desc" placeholder="Descreva a demanda..."></textarea>
+    </div>
+    <div class="field">
+      <label>Responsável</label>
+      <input id="f-resp" type="text" placeholder="Nome">
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Dt. Início</label>
+        <input id="f-ini" type="date" onchange="validateDates()">
+      </div>
+      <div class="field">
+        <label>Prev. Entrega</label>
+        <input id="f-prev" type="date" onchange="validateDates()">
+        <div class="field-err" id="date-err">Data de entrega não pode ser anterior à data de início.</div>
+      </div>
+    </div>
+    <div class="field">
+      <label>Horas estimadas</label>
+      <input id="f-horas" type="number" min="0" step="0.5" placeholder="0">
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal()">Cancelar</button>
+      <button class="btn primary" onclick="saveModal()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<!-- Excel import modal -->
+<div class="overlay" id="xl-overlay" onclick="if(event.target===this)closeXL()">
+  <div class="modal" style="width:520px" role="dialog" aria-modal="true">
+    <h3>Importar Excel / CSV</h3>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:14px">
+      Mapeie as colunas da sua planilha para os campos do sistema. Linhas com ID no formato <code>00001.001</code> serão tratadas como subtópicos automaticamente.
+    </p>
+    <div id="xl-preview" style="margin-bottom:14px;display:none">
+      <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">
+        Prévia — <span id="xl-count"></span> linhas detectadas
+      </div>
+      <div style="overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);max-height:120px;overflow-y:auto">
+        <table id="xl-preview-table" style="width:100%;border-collapse:collapse;font-size:11px;table-layout:auto"></table>
+      </div>
+    </div>
+    <div id="xl-map" style="display:none">
+      <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Mapeamento de colunas</div>
+      <div id="xl-fields" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"></div>
+    </div>
+    <div id="xl-mode" style="margin-top:14px;display:none">
+      <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Modo de importação</div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:6px">
+        <input type="radio" name="xl-mode" value="merge" checked> Mesclar com dados existentes
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+        <input type="radio" name="xl-mode" value="replace"> Substituir todos os dados
+      </label>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeXL()">Cancelar</button>
+      <button class="btn primary" id="xl-import-btn" onclick="doImportExcel()" disabled>Importar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Column widths ────────────────────────────────────────────────────────────
+const DEFAULT_WIDTHS = [110,130,210,120,95,95,62,46,130,120,90,76];
+let colWidths = [...DEFAULT_WIDTHS];
+
+function buildColgroup() {
+  document.getElementById("colgroup").innerHTML =
+    colWidths.map(w => `<col style="width:${w}px">`).join("");
+}
+
+// ── Resizable columns ────────────────────────────────────────────────────────
+function initResizers() {
+  document.querySelectorAll("thead tr.row-labels th.has-resizer").forEach((th, idx) => {
+    const r = document.createElement("div");
+    r.className = "resizer";
+    th.appendChild(r);
+    let startX, startW;
+    r.addEventListener("mousedown", e => {
+      e.preventDefault();
+      startX = e.clientX; startW = colWidths[idx];
+      r.classList.add("active");
+      const onMove = ev => { colWidths[idx] = Math.max(50, startW + ev.clientX - startX); buildColgroup(); };
+      const onUp   = ()  => { r.classList.remove("active"); document.removeEventListener("mousemove", onMove); document.removeEventListener("mouseup", onUp); };
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+    });
+  });
+}
+
+// ── Data ─────────────────────────────────────────────────────────────────────
+let data = [
+  {id:"00001",tipo:"demand",cliente:"Cliente A",desc:"Análise de Vendas Q2",resp:"João",ini:"2026-06-01",prev:"2026-06-30",horas:8,paused:false},
+  {id:"00001.001",tipo:"sub",parent:"00001",cliente:"Cliente A",desc:"Coleta de dados",resp:"João",ini:"2026-06-01",prev:"2026-06-10",horas:2,done:false},
+  {id:"00001.002",tipo:"sub",parent:"00001",cliente:"Cliente A",desc:"Limpeza e tratamento",resp:"Maria",ini:"2026-06-11",prev:"2026-06-20",horas:3,done:true},
+  {id:"00001.003",tipo:"sub",parent:"00001",cliente:"Cliente A",desc:"Dashboard Power BI",resp:"João",ini:"2026-06-21",prev:"2026-06-30",horas:3,done:false},
+  {id:"00002",tipo:"demand",cliente:"Cliente B",desc:"Automação de Relatório Mensal",resp:"Maria",ini:"2026-06-10",prev:"2026-07-10",horas:12,paused:false},
+  {id:"00002.001",tipo:"sub",parent:"00002",cliente:"Cliente B",desc:"Mapeamento do processo",resp:"Maria",ini:"2026-06-10",prev:"2026-06-15",horas:2,done:true},
+  {id:"00002.002",tipo:"sub",parent:"00002",cliente:"Cliente B",desc:"Script Python",resp:"Maria",ini:"2026-06-16",prev:"2026-06-25",horas:6,done:true},
+  {id:"00002.003",tipo:"sub",parent:"00002",cliente:"Cliente B",desc:"Testes e validação",resp:"Maria",ini:"2026-06-26",prev:"2026-07-05",horas:3,done:false},
+  {id:"00002.004",tipo:"sub",parent:"00002",cliente:"Cliente B",desc:"Documentação",resp:"Maria",ini:"2026-07-06",prev:"2026-07-10",horas:1,done:false},
+];
+
+let modalMode = "demand";
+let editId = null;
+
+// ── Theme ─────────────────────────────────────────────────────────────────────
+const savedTheme = localStorage.getItem("theme") || "light";
+if (savedTheme === "dark") document.body.setAttribute("data-theme","dark");
+function toggleTheme() {
+  const dark = document.body.getAttribute("data-theme") === "dark";
+  document.body.setAttribute("data-theme", dark ? "light" : "dark");
+  localStorage.setItem("theme", dark ? "light" : "dark");
+  document.querySelector(".theme-btn").textContent = dark ? "🌙" : "☀️";
+}
+if (savedTheme === "dark") document.querySelector(".theme-btn").textContent = "☀️";
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function getSubs(pid) { return data.filter(r => r.parent === pid); }
+function getStatus(pid) {
+  const r = data.find(x => x.id === pid);
+  if (r && r.paused) return "pause";
+  const s = getSubs(pid);
+  if (!s.length) return "pend";
+  const d = s.filter(x => x.done).length;
+  return d === s.length ? "done" : d === 0 ? "pend" : "prog";
+}
+function getPct(pid) {
+  const s = getSubs(pid);
+  if (!s.length) return 0;
+  return Math.round(s.filter(x => x.done).length / s.length * 100);
+}
+function fmtDate(d) {
+  if (!d) return "—";
+  const p = d.split("-");
+  return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : d;
+}
+function badge(st) {
+  const m = {
+    done:  ["badge-done","Concluído"],
+    prog:  ["badge-prog","Em andamento"],
+    pend:  ["badge-pend","Não iniciado"],
+    pause: ["badge-pause","Pausado"]
+  };
+  const [cls, lbl] = m[st] || m.pend;
+  return `<span class="badge ${cls}">${lbl}</span>`;
+}
+function nextDemandId() {
+  const nums = data.filter(r => r.tipo==="demand").map(r=>parseInt(r.id)).filter(n=>!isNaN(n));
+  return String((nums.length ? Math.max(...nums) : 0)+1).padStart(5,"0");
+}
+function nextSubId(pid) {
+  const nums = getSubs(pid).map(s => { const p=s.id.split("."); return p.length>1?parseInt(p[1]):0; });
+  return pid+"."+String((nums.length ? Math.max(...nums) : 0)+1).padStart(3,"0");
+}
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 2400);
+}
+
+// ── Export / Import ───────────────────────────────────────────────────────────
+function exportJSON() {
+  const blob = new Blob([JSON.stringify({version:1,exportedAt:new Date().toISOString(),data},null,2)],{type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `demandas_${new Date().toISOString().slice(0,10)}.json`;
+  a.click(); URL.revokeObjectURL(a.href);
+  showToast("✓ Dados exportados");
+}
+
+// ── Export Excel (XLSX via CSV + BOM trick → opens in Excel correctly) ────────
+function exportExcel() {
+  const statusLabel = {done:"Concluído",prog:"Em andamento",pend:"Não iniciado",pause:"Pausado"};
+  const headers = ["ID","Tipo","Demanda Pai","Cliente","Descrição","Responsável","Dt. Início","Prev. Entrega","Horas","Concluído","Status"];
+  const rows = [];
+  data.filter(r=>r.tipo==="demand").forEach(d => {
+    const st = getStatus(d.id);
+    rows.push([
+      d.id, "Demanda", "", d.cliente||"", d.desc||"", d.resp||"",
+      fmtDate(d.ini), fmtDate(d.prev), d.horas||0, "",
+      statusLabel[st]||""
+    ]);
+    getSubs(d.id).forEach(s => {
+      rows.push([
+        s.id, "Subtópico", d.id, s.cliente||"", s.desc||"", s.resp||"",
+        fmtDate(s.ini), fmtDate(s.prev), s.horas||0,
+        s.done ? "Sim" : "Não", ""
+      ]);
+    });
+  });
+
+  // Build CSV with semicolons (Excel BR default) and UTF-8 BOM
+  const escape = v => {
+    const str = String(v==null?"":v);
+    return str.includes(";") || str.includes('"') || str.includes("\n")
+      ? `"${str.replace(/"/g,'""')}"` : str;
+  };
+  const csv = [headers, ...rows].map(r => r.map(escape).join(";")).join("\r\n");
+  const bom = "\uFEFF"; // UTF-8 BOM so Excel reads accents correctly
+  const blob = new Blob([bom + csv], {type:"text/csv;charset=utf-8"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `demandas_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click(); URL.revokeObjectURL(a.href);
+  showToast("✓ Excel exportado");
+}
+function importJSON(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const p = JSON.parse(ev.target.result);
+      const imported = p.data || p;
+      if (!Array.isArray(imported)) throw new Error();
+      data = imported; render(); scheduleSave();
+      showToast(`✓ ${imported.length} registros importados`);
+    } catch { showToast("✗ Arquivo inválido"); }
+  };
+  reader.readAsText(file); e.target.value = "";
+}
+
+// ── Expanded state (tree view) ────────────────────────────────────────────────
+const expanded = new Set();
+
+// ── Multi-checkbox filter state ───────────────────────────────────────────────
+// Each key holds a Set of selected values. Empty Set = "all".
+const FILTER_KEYS = ["id","cli","desc","resp","ini","prev","status"];
+const filterSel = {};
+FILTER_KEYS.forEach(k => filterSel[k] = new Set());
+
+const STATUS_OPTS = [
+  {v:"done", l:"Concluído"},
+  {v:"prog", l:"Em andamento"},
+  {v:"pend", l:"Não iniciado"},
+  {v:"pause",l:"Pausado"},
+];
+
+// ── Build a multi-checkbox dropdown widget ────────────────────────────────────
+function buildFC(containerId, key, items, fmt) {
+  const wrap = document.getElementById(containerId);
+  if (!wrap) return;
+  const panelId = `fcp-${key}`;
+  wrap.innerHTML = `
+    <button class="fc-btn" id="fcb-${key}" onclick="toggleFC('${key}')" type="button">
+      <span class="fc-btn-label" id="fcl-${key}">Todos</span>
+      <span class="fc-btn-caret">▾</span>
+    </button>
+    <div class="fc-panel" id="${panelId}">
+      <input class="fc-search" placeholder="Buscar…" oninput="searchFC('${key}',this.value)" id="fcs-${key}">
+      <div class="fc-actions">
+        <button class="fc-act" onclick="selectAllFC('${key}')">Marcar todos</button>
+        <button class="fc-act" onclick="clearFC('${key}')">Limpar</button>
+      </div>
+      <div class="fc-list" id="fclist-${key}"></div>
+    </div>`;
+  renderFCItems(key, items, fmt);
+}
+
+function renderFCItems(key, items, fmt, search) {
+  const list = document.getElementById(`fclist-${key}`);
+  if (!list) return;
+  const q = (search||"").toLowerCase();
+  const filtered = items.filter(v => (fmt?fmt(v):v).toLowerCase().includes(q));
+  if (!filtered.length) { list.innerHTML = `<div class="fc-empty">Sem resultados</div>`; return; }
+  list.innerHTML = filtered.map(v => {
+    const lbl = fmt ? fmt(v) : v;
+    const chk = filterSel[key].has(v) ? "checked" : "";
+    return `<label class="fc-item">
+      <input type="checkbox" ${chk} value="${v}" onchange="toggleFCItem('${key}','${v}',this.checked)">
+      <span class="fc-item-label">${lbl}</span>
+    </label>`;
+  }).join("");
+}
+
+function toggleFC(key) {
+  const panel = document.getElementById(`fcp-${key}`);
+  const btn   = document.getElementById(`fcb-${key}`);
+  const isOpen = panel.classList.contains("open");
+  // close all others
+  FILTER_KEYS.forEach(k => {
+    document.getElementById(`fcp-${k}`)?.classList.remove("open");
+    document.getElementById(`fcb-${k}`)?.classList.remove("open");
+  });
+  if (!isOpen) { panel.classList.add("open"); btn.classList.add("open"); }
+}
+
+function searchFC(key, val) {
+  // rebuild items for this key with search
+  const items = fcCurrentItems[key] || [];
+  renderFCItems(key, items, fcFmts[key], val);
+}
+
+function toggleFCItem(key, val, checked) {
+  if (checked) filterSel[key].add(val);
+  else filterSel[key].delete(val);
+  updateFCLabel(key);
+  render();
+}
+
+function selectAllFC(key) {
+  (fcCurrentItems[key]||[]).forEach(v => filterSel[key].add(v));
+  renderFCItems(key, fcCurrentItems[key]||[], fcFmts[key]);
+  updateFCLabel(key);
+  render();
+}
+
+function clearFC(key) {
+  filterSel[key].clear();
+  renderFCItems(key, fcCurrentItems[key]||[], fcFmts[key]);
+  updateFCLabel(key);
+  render();
+}
+
+function updateFCLabel(key) {
+  const sel = filterSel[key];
+  const btn = document.getElementById(`fcb-${key}`);
+  const lbl = document.getElementById(`fcl-${key}`);
+  if (!lbl) return;
+  if (sel.size === 0) {
+    lbl.textContent = "Todos";
+    btn?.classList.remove("active");
+  } else {
+    const items = fcCurrentItems[key]||[];
+    const fmt   = fcFmts[key];
+    const names = [...sel].map(v => fmt ? fmt(v) : v);
+    lbl.textContent = names.length <= 2 ? names.join(", ") : `${names.length} selecionados`;
+    btn?.classList.add("active");
+  }
+}
+
+// Storage for current item lists (so search can reference them)
+const fcCurrentItems = {};
+const fcFmts = {};
+
+// ── Get active search query ───────────────────────────────────────────────────
+function getQ() { return (document.getElementById("search")?.value||"").toLowerCase(); }
+
+// ── Filter demands based on active multi-checkbox selections ──────────────────
+function filteredDemands() {
+  const q = getQ();
+  return data.filter(r => r.tipo === "demand").filter(d => {
+    const st = getStatus(d.id);
+    if (filterSel.id.size     && !filterSel.id.has(d.id))           return false;
+    if (filterSel.cli.size    && !filterSel.cli.has(d.cliente))     return false;
+    if (filterSel.desc.size   && !filterSel.desc.has(d.desc))       return false;
+    if (filterSel.resp.size   && !filterSel.resp.has(d.resp))       return false;
+    if (filterSel.ini.size    && !filterSel.ini.has(d.ini))         return false;
+    if (filterSel.prev.size   && !filterSel.prev.has(d.prev))       return false;
+    if (filterSel.status.size && !filterSel.status.has(st))         return false;
+    if (q && !(d.desc||"").toLowerCase().includes(q))               return false;
+    return true;
+  });
+}
+
+// ── Update filter options (concatenated — each col ignores itself) ────────────
+function updateFilterOptions() {
+  const q = getQ();
+
+  function demandsIgnoring(skipKey) {
+    return data.filter(r => r.tipo === "demand").filter(d => {
+      const st = getStatus(d.id);
+      if (skipKey!=="id"     && filterSel.id.size     && !filterSel.id.has(d.id))       return false;
+      if (skipKey!=="cli"    && filterSel.cli.size    && !filterSel.cli.has(d.cliente))  return false;
+      if (skipKey!=="desc"   && filterSel.desc.size   && !filterSel.desc.has(d.desc))   return false;
+      if (skipKey!=="resp"   && filterSel.resp.size   && !filterSel.resp.has(d.resp))   return false;
+      if (skipKey!=="ini"    && filterSel.ini.size    && !filterSel.ini.has(d.ini))     return false;
+      if (skipKey!=="prev"   && filterSel.prev.size   && !filterSel.prev.has(d.prev))   return false;
+      if (skipKey!=="status" && filterSel.status.size && !filterSel.status.has(st))     return false;
+      if (q && !(d.desc||"").toLowerCase().includes(q))                                 return false;
+      return true;
+    });
+  }
+
+  const specs = [
+    {key:"id",     cId:"fc-id",     items: d => [...new Set(demandsIgnoring("id").map(r=>r.id))]},
+    {key:"cli",    cId:"fc-cli",    items: d => [...new Set(demandsIgnoring("cli").map(r=>r.cliente).filter(Boolean))]},
+    {key:"desc",   cId:"fc-desc",   items: d => [...new Set(demandsIgnoring("desc").map(r=>r.desc).filter(Boolean))]},
+    {key:"resp",   cId:"fc-resp",   items: d => [...new Set(demandsIgnoring("resp").map(r=>r.resp).filter(Boolean))]},
+    {key:"ini",    cId:"fc-ini",    items: d => [...new Set(demandsIgnoring("ini").map(r=>r.ini).filter(Boolean))].sort(), fmt: fmtDate},
+    {key:"prev",   cId:"fc-prev",   items: d => [...new Set(demandsIgnoring("prev").map(r=>r.prev).filter(Boolean))].sort(), fmt: fmtDate},
+    {key:"status", cId:"fc-status", items: () => STATUS_OPTS.filter(o => demandsIgnoring("status").some(d=>getStatus(d.id)===o.v)).map(o=>o.v), fmt: v => STATUS_OPTS.find(o=>o.v===v)?.l||v},
+  ];
+
+  specs.forEach(({key, cId, items, fmt}) => {
+    const newItems = items();
+    const wrap = document.getElementById(cId);
+    if (!wrap) return;
+
+    // Build widget if not yet built
+    if (!wrap.querySelector(".fc-btn")) {
+      fcFmts[key] = fmt;
+      fcCurrentItems[key] = newItems;
+      buildFC(cId, key, newItems, fmt);
+      return;
+    }
+
+    // Update items — preserve checked state, remove stale, add new
+    const search = document.getElementById(`fcs-${key}`)?.value||"";
+    fcFmts[key] = fmt;
+    fcCurrentItems[key] = newItems;
+    // Remove stale selected values
+    [...filterSel[key]].forEach(v => { if (!newItems.includes(v)) filterSel[key].delete(v); });
+    renderFCItems(key, newItems, fmt, search);
+    updateFCLabel(key);
+  });
+}
+
+// ── Stats ─────────────────────────────────────────────────────────────────────
+function updateStats() {
+  const demands = data.filter(r => r.tipo === "demand");
+  const done   = demands.filter(r => getStatus(r.id) === "done").length;
+  const prog   = demands.filter(r => getStatus(r.id) === "prog").length;
+  const pend   = demands.filter(r => getStatus(r.id) === "pend").length;
+  const paused = demands.filter(r => getStatus(r.id) === "pause").length;
+  const clis   = [...new Set(data.map(r=>r.cliente).filter(Boolean))];
+  document.getElementById("stats").innerHTML = `
+    <div class="stat"><div class="stat-label">Demandas</div><div class="stat-val">${demands.length}</div></div>
+    <div class="stat"><div class="stat-label">Concluídas</div><div class="stat-val green">${done}</div></div>
+    <div class="stat"><div class="stat-label">Em andamento</div><div class="stat-val amber">${prog}</div></div>
+    <div class="stat"><div class="stat-label">Não iniciadas</div><div class="stat-val muted">${pend}</div></div>
+    <div class="stat"><div class="stat-label">Pausadas</div><div class="stat-val gray">${paused}</div></div>
+    <div class="stat"><div class="stat-label">Clientes</div><div class="stat-val">${clis.length}</div></div>
+  `;
+}
+
+// ── Toggle expand/collapse ────────────────────────────────────────────────────
+function toggleExpand(id) {
+  if (expanded.has(id)) expanded.delete(id);
+  else expanded.add(id);
+  render();
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function render() {
+  const visible = filteredDemands();
+  const hasActive = FILTER_KEYS.some(k=>filterSel[k].size>0) || !!getQ();
+  if (hasActive) visible.forEach(d => expanded.add(d.id));
+
+  let html = "";
+  visible.forEach(d => {
+    const st       = getStatus(d.id);
+    const pct      = getPct(d.id);
+    const isPaused = !!d.paused;
+    const subs     = getSubs(d.id);
+    const isExp    = expanded.has(d.id);
+    const hasSubs  = subs.length > 0;
+    const toggle   = hasSubs
+      ? `<button class="tree-toggle" onclick="toggleExpand('${d.id}')" aria-label="${isExp?'Recolher':'Expandir'}">${isExp?"▾":"▸"}</button>`
+      : `<span class="tree-leaf">·</span>`;
+
+    html += `<tr class="${isPaused?"row-demand paused":"row-demand"}">
+      <td><span style="display:inline-flex;align-items:center;gap:4px">${toggle}<span class="id-badge">${d.id}</span></span></td>
+      <td>${d.cliente||"—"}</td>
+      <td class="wrap">${d.desc||"—"}</td>
+      <td>${d.resp||"—"}</td>
+      <td>${fmtDate(d.ini)}</td>
+      <td>${fmtDate(d.prev)}</td>
+      <td class="center">${d.horas||0}h</td>
+      <td class="center">—</td>
+      <td><div class="pct-bar"><div class="bar-bg"><div class="bar-fill" style="width:${pct}%"></div></div><span class="pct-label">${pct}%</span></div></td>
+      <td>${badge(st)}</td>
+      <td class="center">
+        <input type="checkbox" class="pause-chk" ${isPaused?"checked":""}
+          onchange="togglePause('${d.id}',this.checked)" aria-label="Pausar demanda">
+      </td>
+      <td class="center" style="display:flex;gap:4px;justify-content:center;align-items:center;padding:5px 4px">
+        <button class="btn sm" onclick="openEdit('${d.id}')" title="Editar">✏️</button>
+        <button class="btn sm danger" onclick="del('${d.id}')" title="Remover">🗑</button>
+      </td>
+    </tr>`;
+
+    if (isExp) {
+      subs.forEach((s, si) => {
+        const isLast = si === subs.length - 1;
+        const connector = isLast ? "└" : "├";
+        html += `<tr class="${isPaused?"row-sub paused":"row-sub"}">
+          <td><span style="display:inline-flex;align-items:center;gap:2px;padding-left:8px">
+            <span class="tree-connector">${connector}</span>
+            <span class="id-badge" style="font-size:10px;opacity:.75">${s.id}</span>
+          </span></td>
+          <td>${s.cliente||"—"}</td>
+          <td class="wrap">${s.desc||"—"}</td>
+          <td>${s.resp||"—"}</td>
+          <td>${fmtDate(s.ini)}</td>
+          <td>${fmtDate(s.prev)}</td>
+          <td class="center">${s.horas||0}h</td>
+          <td class="center">
+            <input type="checkbox" class="chk" ${s.done?"checked":""} ${isPaused?"disabled":""}
+              onchange="toggleSub('${s.id}',this.checked)" aria-label="Concluído">
+          </td>
+          <td>—</td>
+          <td></td>
+          <td class="center">—</td>
+          <td class="center" style="display:flex;gap:4px;justify-content:center;align-items:center;padding:5px 4px">
+            <button class="btn sm" onclick="openEdit('${s.id}')" title="Editar">✏️</button>
+            <button class="btn sm danger" onclick="del('${s.id}')" title="Remover">🗑</button>
+          </td>
+        </tr>`;
+      });
+    }
+  });
+
+  document.getElementById("tbody").innerHTML = html ||
+    `<tr><td colspan="12" class="empty">Nenhuma demanda encontrada.</td></tr>`;
+  updateStats();
+  updateFilterOptions();
+}
+
+// Close panels when clicking outside
+document.addEventListener("click", e => {
+  if (!e.target.closest(".fc-wrap")) {
+    FILTER_KEYS.forEach(k => {
+      document.getElementById(`fcp-${k}`)?.classList.remove("open");
+      document.getElementById(`fcb-${k}`)?.classList.remove("open");
+    });
+  }
+});
+
+// ── Toggle pause ──────────────────────────────────────────────────────────────
+function togglePause(id, val) {
+  const r = data.find(x => x.id === id);
+  if (r) r.paused = val;
+  render();
+  scheduleSave();
+  showToast(val ? "⏸ Demanda pausada" : "▶ Demanda retomada");
+}
+
+// ── Toggle sub checkbox ───────────────────────────────────────────────────────
+function toggleSub(id, val) {
+  const r = data.find(x => x.id === id);
+  if (r) r.done = val;
+  render();
+  scheduleSave();
+}
+
+// ── Delete ────────────────────────────────────────────────────────────────────
+function del(id) {
+  const isDemand = data.find(r => r.id === id && r.tipo === "demand");
+  if (isDemand && !confirm("Remover a demanda e todos os subtópicos?")) return;
+  data = isDemand ? data.filter(r => r.id !== id && r.parent !== id) : data.filter(r => r.id !== id);
+  render();
+  scheduleSave();
+  showToast("✓ Removido");
+}
+
+// ── Date validation ───────────────────────────────────────────────────────────
+function validateDates() {
+  const ini  = document.getElementById("f-ini").value;
+  const prev = document.getElementById("f-prev").value;
+  const err  = document.getElementById("date-err");
+  const inp  = document.getElementById("f-prev");
+  if (ini && prev && prev < ini) {
+    err.style.display = "block"; inp.classList.add("err"); return false;
+  }
+  err.style.display = "none"; inp.classList.remove("err"); return true;
+}
+
+// ── Auto-fill cliente from parent ─────────────────────────────────────────────
+function autoFillCliente() {
+  const pid = document.getElementById("f-parent").value;
+  if (!pid) return;
+  const parent = data.find(r => r.id === pid);
+  if (parent && parent.cliente) {
+    document.getElementById("f-cliente").value = parent.cliente;
+  }
+}
+
+// ── Open modal (new) ──────────────────────────────────────────────────────────
+function openModal(mode) {
+  modalMode = mode; editId = null;
+  document.getElementById("modal-title").textContent =
+    mode === "demand" ? "Nova demanda" : "Novo subtópico";
+  const pf = document.getElementById("field-parent");
+  if (mode === "sub") {
+    pf.style.display = "block";
+    document.getElementById("f-parent").innerHTML =
+      `<option value="">Selecione a Demanda</option>` +
+      data.filter(r => r.tipo==="demand")
+          .map(d => `<option value="${d.id}">${d.id} — ${d.desc}</option>`).join("");
+  } else {
+    pf.style.display = "none";
+  }
+  ["f-cliente","f-desc","f-resp","f-ini","f-prev","f-horas"].forEach(id => document.getElementById(id).value="");
+  document.getElementById("date-err").style.display = "none";
+  document.getElementById("f-prev").classList.remove("err");
+  document.getElementById("overlay").classList.add("open");
+  setTimeout(() => document.getElementById("f-cliente").focus(), 50);
+}
+
+// ── Open modal (edit) ─────────────────────────────────────────────────────────
+function openEdit(id) {
+  const r = data.find(x => x.id === id); if (!r) return;
+  editId = id; modalMode = r.tipo;
+  document.getElementById("modal-title").textContent =
+    r.tipo === "demand" ? "Editar demanda" : "Editar subtópico";
+  const pf = document.getElementById("field-parent");
+  if (r.tipo === "sub") {
+    pf.style.display = "block";
+    document.getElementById("f-parent").innerHTML =
+      data.filter(x => x.tipo==="demand")
+          .map(d => `<option value="${d.id}"${d.id===r.parent?" selected":""}>${d.id} — ${d.desc}</option>`).join("");
+  } else {
+    pf.style.display = "none";
+  }
+  document.getElementById("f-cliente").value = r.cliente||"";
+  document.getElementById("f-desc").value    = r.desc||"";
+  document.getElementById("f-resp").value    = r.resp||"";
+  document.getElementById("f-ini").value     = r.ini||"";
+  document.getElementById("f-prev").value    = r.prev||"";
+  document.getElementById("f-horas").value   = r.horas||"";
+  document.getElementById("date-err").style.display = "none";
+  document.getElementById("f-prev").classList.remove("err");
+  document.getElementById("overlay").classList.add("open");
+  setTimeout(() => document.getElementById("f-cliente").focus(), 50);
+}
+
+function closeModal() { document.getElementById("overlay").classList.remove("open"); }
+
+// ── Save modal ────────────────────────────────────────────────────────────────
+function saveModal() {
+  const desc = document.getElementById("f-desc").value.trim();
+  if (!desc) { alert("Informe a descrição."); return; }
+  if (!validateDates()) return;
+  const obj = {
+    cliente: document.getElementById("f-cliente").value.trim(),
+    desc,
+    resp:  document.getElementById("f-resp").value.trim(),
+    ini:   document.getElementById("f-ini").value,
+    prev:  document.getElementById("f-prev").value,
+    horas: parseFloat(document.getElementById("f-horas").value)||0
+  };
+  if (editId) {
+    const idx = data.findIndex(x => x.id === editId);
+    if (idx !== -1) data[idx] = {...data[idx], ...obj};
+    showToast("✓ Atualizado");
+  } else if (modalMode === "demand") {
+    data.push({id:nextDemandId(),tipo:"demand",...obj,paused:false});
+    showToast("✓ Demanda criada");
+  } else {
+    const parent = document.getElementById("f-parent").value;
+    if (!parent) { alert("Selecione a Demanda pai."); return; }
+    data.push({id:nextSubId(parent),tipo:"sub",parent,...obj,done:false});
+    showToast("✓ Subtópico criado");
+  }
+  closeModal();
+  render();
+  scheduleSave();
+}
+
+// ── Excel Import ──────────────────────────────────────────────────────────────
+let xlRows = [];   // raw parsed rows [{col: val, ...}]
+let xlHeaders = []; // column names from file
+
+const XL_FIELDS = [
+  { key:"id",       label:"ID",               required:true  },
+  { key:"tipo",     label:"Tipo (demand/sub)", required:false },
+  { key:"parent",   label:"Demanda Pai (ID)",  required:false },
+  { key:"cliente",  label:"Cliente",           required:false },
+  { key:"desc",     label:"Descrição",         required:true  },
+  { key:"resp",     label:"Responsável",       required:false },
+  { key:"ini",      label:"Dt. Início",        required:false },
+  { key:"prev",     label:"Prev. Entrega",     required:false },
+  { key:"horas",    label:"Horas",             required:false },
+];
+
+function importExcel(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  e.target.value = "";
+
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const wb = XLSX.read(ev.target.result, { type:"array", cellDates:true });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const raw = XLSX.utils.sheet_to_json(ws, { defval:"", raw:false });
+
+      if (!raw.length) { showToast("✗ Planilha vazia ou sem dados"); return; }
+
+      xlRows    = raw;
+      xlHeaders = Object.keys(raw[0]);
+
+      // Build preview table (first 5 rows)
+      const previewRows = raw.slice(0,5);
+      const hdrs = xlHeaders.map(h => `<th style="padding:5px 8px;border-bottom:1px solid var(--border);white-space:nowrap;font-size:10px;text-transform:uppercase;color:var(--text3)">${h}</th>`).join("");
+      const body = previewRows.map(r =>
+        `<tr>${xlHeaders.map(h => `<td style="padding:4px 8px;border-bottom:1px solid var(--border);white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis;font-size:11px">${r[h]??""}</td>`).join("")}</tr>`
+      ).join("");
+      document.getElementById("xl-preview-table").innerHTML = `<thead><tr>${hdrs}</tr></thead><tbody>${body}</tbody>`;
+      document.getElementById("xl-count").textContent = `${raw.length}`;
+      document.getElementById("xl-preview").style.display = "block";
+
+      // Build mapping selectors
+      const mapHTML = XL_FIELDS.map(f => {
+        const opts = xlHeaders.map(h => {
+          // auto-detect by common names
+          const hLow = h.toLowerCase().replace(/[^a-z]/g,"");
+          const autoMap = {
+            id:["id","codigo","cod"],
+            tipo:["tipo","type","categoria"],
+            parent:["pai","parent","demandapai","demanda"],
+            cliente:["cliente","client","empresa"],
+            desc:["descricao","desc","description","titulo","tarefa","atividade","nome"],
+            resp:["responsavel","resp","responsible","owner","pessoa"],
+            ini:["inicio","datainicio","start","dtinicio","dataini"],
+            prev:["previsao","prev","entrega","deadline","datafim","dtfim","prazo"],
+            horas:["horas","hours","tempo","estimativa"],
+          };
+          const isAuto = (autoMap[f.key]||[]).some(k => hLow.includes(k));
+          return `<option value="${h}" ${isAuto?"selected":""}>${h}</option>`;
+        }).join("");
+        const req = f.required ? ' <span style="color:var(--red)">*</span>' : "";
+        return `<div>
+          <div style="font-size:11px;font-weight:500;color:var(--text2);margin-bottom:3px">${f.label}${req}</div>
+          <select id="xlm-${f.key}" style="width:100%;font-family:Inter,sans-serif;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);outline:none;height:30px">
+            <option value="">— ignorar —</option>
+            ${opts}
+          </select>
+        </div>`;
+      }).join("");
+      document.getElementById("xl-fields").innerHTML = mapHTML;
+      document.getElementById("xl-map").style.display  = "block";
+      document.getElementById("xl-mode").style.display = "block";
+      document.getElementById("xl-import-btn").disabled = false;
+      document.getElementById("xl-overlay").classList.add("open");
+    } catch(err) {
+      console.error(err);
+      showToast("✗ Erro ao ler o arquivo. Verifique se é .xlsx, .xls ou .csv válido.");
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function parseExcelDate(val) {
+  if (!val) return "";
+  // If already looks like DD/MM/YYYY or YYYY-MM-DD
+  const iso = String(val).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  const br = String(val).match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (br) return `${br[3]}-${br[2]}-${br[1]}`;
+  return String(val).slice(0,10) || "";
+}
+
+function doImportExcel() {
+  const getMap = key => document.getElementById(`xlm-${key}`)?.value || "";
+  const mode   = document.querySelector('input[name="xl-mode"]:checked')?.value || "merge";
+
+  const idCol   = getMap("id");
+  const descCol = getMap("desc");
+  if (!idCol || !descCol) { alert("Mapeie pelo menos ID e Descrição para continuar."); return; }
+
+  const imported = [];
+  const demandIds = new Set();
+
+  xlRows.forEach((row, i) => {
+    const rawId   = String(row[idCol]||"").trim();
+    const rawDesc = String(row[descCol]||"").trim();
+    if (!rawId && !rawDesc) return; // skip empty rows
+
+    // Detect tipo
+    const tipoCol = getMap("tipo");
+    let tipo = tipoCol ? String(row[tipoCol]||"").toLowerCase() : "";
+    const isSub = rawId.includes(".") || tipo.includes("sub");
+    tipo = isSub ? "sub" : "demand";
+
+    // Format ID: ensure 5-digit demand or 5.3 subtopic
+    let id = rawId;
+    if (!id) id = isSub ? `00001.${String(i+1).padStart(3,"0")}` : String(i+1).padStart(5,"0");
+
+    const rec = {
+      id,
+      tipo,
+      cliente: getMap("cliente") ? String(row[getMap("cliente")]||"").trim() : "",
+      desc:    rawDesc || `Registro ${i+1}`,
+      resp:    getMap("resp")    ? String(row[getMap("resp")]||"").trim()   : "",
+      ini:     getMap("ini")     ? parseExcelDate(row[getMap("ini")])        : "",
+      prev:    getMap("prev")    ? parseExcelDate(row[getMap("prev")])       : "",
+      horas:   getMap("horas")   ? parseFloat(row[getMap("horas")])||0       : 0,
+    };
+
+    if (tipo === "demand") {
+      rec.paused = false;
+      demandIds.add(id);
+    } else {
+      // parent: explicit column, or derive from ID prefix
+      const parentCol = getMap("parent");
+      let parent = parentCol ? String(row[parentCol]||"").trim() : "";
+      if (!parent && id.includes(".")) parent = id.split(".")[0];
+      rec.parent = parent;
+      rec.done   = false;
+    }
+
+    imported.push(rec);
+  });
+
+  if (!imported.length) { showToast("✗ Nenhum registro válido encontrado"); return; }
+
+  if (mode === "replace") {
+    data = imported;
+  } else {
+    // Merge: update existing by ID, append new
+    imported.forEach(rec => {
+      const idx = data.findIndex(r => r.id === rec.id);
+      if (idx !== -1) data[idx] = {...data[idx], ...rec};
+      else data.push(rec);
+    });
+  }
+
+  // Re-expand all demands
+  data.filter(r=>r.tipo==="demand").forEach(d=>expanded.add(d.id));
+  closeXL();
+  render();
+  scheduleSave();
+  showToast(`✓ ${imported.length} registros importados`);
+}
+
+function closeXL() {
+  document.getElementById("xl-overlay").classList.remove("open");
+  xlRows = []; xlHeaders = [];
+}
+
+function expandAll() {
+  data.filter(r=>r.tipo==="demand").forEach(d=>expanded.add(d.id));
+  render();
+}
+function collapseAll() {
+  expanded.clear();
+  render();
+}
+
+document.addEventListener("keydown", e => { if (e.key==="Escape") { closeModal(); closeXL(); } });
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ── Google Sheets Sync ────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+const API_URL = "https://script.google.com/macros/s/AKfycbzo2z-mF92zlyFrpMx2jc7lLOnUKad1kNQjuDhMNXchPy6e_ze0bczEvOPH9g0BcU8K/exec";
+
+// Last known server snapshot (used for conflict detection)
+let serverSnapshot = null;
+// Pending save timer
+let saveTimer = null;
+// Flag: conflict pending resolution
+let conflictPending = null;
+
+// ── Sync bar UI ───────────────────────────────────────────────────────────────
+function setSyncBar(state, label) {
+  const bar = document.getElementById("sync-bar");
+  const lbl = document.getElementById("sync-label");
+  bar.className = `sync-bar ${state}`;
+  lbl.textContent = label;
+}
+
+function syncBarClick() {
+  const bar = document.getElementById("sync-bar");
+  if (bar.classList.contains("error")) loadFromSheets();
+}
+
+// ── Load data from Sheets ─────────────────────────────────────────────────────
+async function loadFromSheets() {
+  setSyncBar("saving", "Carregando…");
+  try {
+    const res  = await fetch(API_URL + "?t=" + Date.now());
+    const json = await res.json();
+    if (!json.ok) throw new Error("Resposta inválida");
+
+    serverSnapshot = JSON.stringify(json.data);
+
+    // If there are pending local changes, check for conflict
+    if (saveTimer !== null && serverSnapshot !== JSON.stringify(data)) {
+      showConflict(json.data);
+      return;
+    }
+
+    data = json.data;
+    data.filter(r=>r.tipo==="demand").forEach(d=>expanded.add(d.id));
+    render();
+    setSyncBar("saved", "Sincronizado · " + nowTime());
+
+    // Start polling every 30s
+    startPolling();
+  } catch(e) {
+    console.error(e);
+    setSyncBar("error", "Erro ao carregar — clique para tentar novamente");
+    // Fall back to sample data so app is still usable
+    data.filter(r=>r.tipo==="demand").forEach(d=>expanded.add(d.id));
+    render();
+  }
+}
+
+// ── Save data to Sheets (debounced 3s) ───────────────────────────────────────
+function scheduleSave() {
+  setSyncBar("saving", "Aguardando para salvar…");
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(doSave, 3000);
+}
+
+async function doSave() {
+  saveTimer = null;
+  setSyncBar("saving", "Salvando…");
+  try {
+    // Conflict check: compare current server state
+    const checkRes  = await fetch(API_URL + "?t=" + Date.now());
+    const checkJson = await checkRes.json();
+    const freshSnap = JSON.stringify(checkJson.data);
+
+    if (serverSnapshot !== null && freshSnap !== serverSnapshot) {
+      // Server changed since last load — conflict!
+      showConflict(checkJson.data);
+      return;
+    }
+
+    // No conflict — save
+    const res  = await fetch(API_URL, {
+      method: "POST",
+      body:   JSON.stringify({ data }),
+    });
+    const json = await res.json();
+    if (!json.ok) throw new Error("Falha ao salvar");
+
+    serverSnapshot = JSON.stringify(data);
+    setSyncBar("saved", "Salvo · " + nowTime());
+  } catch(e) {
+    console.error(e);
+    setSyncBar("error", "Erro ao salvar — clique para tentar novamente");
+  }
+}
+
+// ── Conflict resolution ───────────────────────────────────────────────────────
+function showConflict(serverData) {
+  conflictPending = serverData;
+  document.getElementById("conflict-overlay").classList.add("open");
+  setSyncBar("conflict", "Conflito detectado — clique para resolver");
+}
+
+function resolveConflict(choice) {
+  document.getElementById("conflict-overlay").classList.remove("open");
+  if (!conflictPending) return;
+
+  if (choice === "mine") {
+    // Push local data to server
+    doSave();
+  } else if (choice === "theirs") {
+    // Load server data, discard local
+    data = conflictPending;
+    serverSnapshot = JSON.stringify(data);
+    data.filter(r=>r.tipo==="demand").forEach(d=>expanded.add(d.id));
+    render();
+    setSyncBar("saved", "Atualizado · " + nowTime());
+  } else {
+    // Merge: keep local records, add server records not present locally
+    const localIds = new Set(data.map(r=>r.id));
+    conflictPending.forEach(r => { if (!localIds.has(r.id)) data.push(r); });
+    serverSnapshot = JSON.stringify(data);
+    data.filter(r=>r.tipo==="demand").forEach(d=>expanded.add(d.id));
+    render();
+    // Save merged result
+    doSave();
+  }
+  conflictPending = null;
+}
+
+// ── Polling: check for remote changes every 30s ───────────────────────────────
+let pollingInterval = null;
+function startPolling() {
+  if (pollingInterval) return;
+  pollingInterval = setInterval(async () => {
+    // Only poll if no pending local save
+    if (saveTimer !== null) return;
+    try {
+      const res  = await fetch(API_URL + "?t=" + Date.now());
+      const json = await res.json();
+      if (!json.ok) return;
+      const freshSnap = JSON.stringify(json.data);
+      if (freshSnap !== serverSnapshot) {
+        // Remote changed — show non-blocking banner
+        serverSnapshot = freshSnap;
+        setSyncBar("conflict", "🔄 Dados atualizados no servidor — clique em ↺ Atualizar");
+      }
+    } catch { /* silently ignore polling errors */ }
+  }, 30000);
+}
+
+// ── Helper ────────────────────────────────────────────────────────────────────
+function nowTime() {
+  return new Date().toLocaleTimeString("pt-BR", {hour:"2-digit", minute:"2-digit"});
+}
+
+// ── Hook: auto-save on every render after initial load ────────────────────────
+// serverSnapshot starts null; once loadFromSheets sets it, saves are scheduled
+let _initialLoadDone = false;
+
+// Patch scheduleSave into render by overriding after definition
+// (safe because loadFromSheets calls render after setting serverSnapshot)
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+buildColgroup();
+initResizers();
+loadFromSheets();  // loads data from Google Sheets on startup; calls render() internally
+
+</script>
+</body>
+</html>
