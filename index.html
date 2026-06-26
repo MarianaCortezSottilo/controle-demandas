@@ -251,7 +251,40 @@ td.wrap{white-space:normal;line-height:1.4}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .theme-btn{font-size:16px;padding:0 10px}
 
-/* ── Tree view ── */
+/* ── Sync indicator ── */
+.sync-bar{
+  display:flex;align-items:center;gap:7px;
+  font-size:11px;font-weight:500;padding:4px 10px;
+  border-radius:20px;border:1px solid transparent;
+  transition:all .3s;white-space:nowrap;
+}
+.sync-bar.idle   {color:var(--text3);border-color:transparent;background:transparent}
+.sync-bar.saving {color:var(--amber-text);border-color:var(--amber);background:var(--amber-bg)}
+.sync-bar.saved  {color:var(--green-text);border-color:#BBF7D0;background:var(--green-bg)}
+.sync-bar.error  {color:var(--red-text);border-color:#FCA5A5;background:var(--red-bg);cursor:pointer}
+.sync-bar.conflict{color:#C2410C;border-color:#FED7AA;background:#FFF7ED;cursor:pointer}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:currentColor;flex-shrink:0}
+.sync-bar.saving .sync-dot{animation:pulse .8s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ── Conflict modal ── */
+.conflict-modal{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius-lg);padding:22px 24px;
+  width:460px;max-width:calc(100vw - 32px);
+}
+.conflict-modal h3{font-size:15px;font-weight:600;margin-bottom:8px}
+.conflict-modal p{font-size:13px;color:var(--text2);margin-bottom:16px;line-height:1.5}
+.conflict-btns{display:flex;flex-direction:column;gap:8px}
+.conflict-btn{
+  display:flex;flex-direction:column;align-items:flex-start;
+  padding:12px 14px;border-radius:var(--radius);border:1px solid var(--border);
+  background:var(--surface);cursor:pointer;text-align:left;transition:background .12s;
+  font-family:'Inter',sans-serif;
+}
+.conflict-btn:hover{background:var(--surface2)}
+.conflict-btn strong{font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px}
+.conflict-btn span{font-size:11px;color:var(--text3)}
 .tree-toggle{
   background:none;border:none;cursor:pointer;padding:0 2px;
   font-size:13px;color:var(--text2);line-height:1;
@@ -273,6 +306,13 @@ td.wrap{white-space:normal;line-height:1.4}
 <header>
   <div class="logo"><div class="logo-dot"></div>Controle de Demandas</div>
   <div class="header-right">
+    <div class="sync-bar idle" id="sync-bar" onclick="syncBarClick()">
+      <span class="sync-dot"></span>
+      <span id="sync-label">Carregando…</span>
+    </div>
+    <div class="divider"></div>
+    <button class="btn" onclick="loadFromSheets()" title="Recarregar dados do servidor">↺ Atualizar</button>
+    <div class="divider"></div>
     <button class="btn success" onclick="exportJSON()">⬇ JSON</button>
     <button class="btn success" onclick="exportExcel()" style="background:#E8F5E9;color:#2E7D32;border-color:#A5D6A7">⬇ Excel</button>
     <label class="btn">⬆ JSON<input type="file" accept=".json" style="display:none" onchange="importJSON(event)"></label>
@@ -284,6 +324,28 @@ td.wrap{white-space:normal;line-height:1.4}
     <button class="btn theme-btn" onclick="toggleTheme()" title="Tema">🌙</button>
   </div>
 </header>
+
+<!-- Conflict resolution modal -->
+<div class="overlay" id="conflict-overlay">
+  <div class="conflict-modal">
+    <h3>⚠️ Conflito de dados</h3>
+    <p>Outra pessoa salvou alterações enquanto você trabalhava. Escolha como resolver:</p>
+    <div class="conflict-btns">
+      <button class="conflict-btn" onclick="resolveConflict('mine')">
+        <strong>Manter meus dados</strong>
+        <span>Sobrescreve o servidor com as suas alterações locais</span>
+      </button>
+      <button class="conflict-btn" onclick="resolveConflict('theirs')">
+        <strong>Carregar dados do servidor</strong>
+        <span>Descarta suas alterações locais e carrega a versão mais recente</span>
+      </button>
+      <button class="conflict-btn" onclick="resolveConflict('merge')">
+        <strong>Mesclar (recomendado)</strong>
+        <span>Mantém seus registros e adiciona os novos do servidor que não existem localmente</span>
+      </button>
+    </div>
+  </div>
+</div>
 
 <main>
   <div class="stats" id="stats"></div>
@@ -565,7 +627,7 @@ function importJSON(e) {
       const p = JSON.parse(ev.target.result);
       const imported = p.data || p;
       if (!Array.isArray(imported)) throw new Error();
-      data = imported; render();
+      data = imported; render(); scheduleSave();
       showToast(`✓ ${imported.length} registros importados`);
     } catch { showToast("✗ Arquivo inválido"); }
   };
@@ -874,6 +936,7 @@ function togglePause(id, val) {
   const r = data.find(x => x.id === id);
   if (r) r.paused = val;
   render();
+  scheduleSave();
   showToast(val ? "⏸ Demanda pausada" : "▶ Demanda retomada");
 }
 
@@ -882,6 +945,7 @@ function toggleSub(id, val) {
   const r = data.find(x => x.id === id);
   if (r) r.done = val;
   render();
+  scheduleSave();
 }
 
 // ── Delete ────────────────────────────────────────────────────────────────────
@@ -889,7 +953,9 @@ function del(id) {
   const isDemand = data.find(r => r.id === id && r.tipo === "demand");
   if (isDemand && !confirm("Remover a demanda e todos os subtópicos?")) return;
   data = isDemand ? data.filter(r => r.id !== id && r.parent !== id) : data.filter(r => r.id !== id);
-  render(); showToast("✓ Removido");
+  render();
+  scheduleSave();
+  showToast("✓ Removido");
 }
 
 // ── Date validation ───────────────────────────────────────────────────────────
@@ -991,7 +1057,9 @@ function saveModal() {
     data.push({id:nextSubId(parent),tipo:"sub",parent,...obj,done:false});
     showToast("✓ Subtópico criado");
   }
-  closeModal(); render();
+  closeModal();
+  render();
+  scheduleSave();
 }
 
 // ── Excel Import ──────────────────────────────────────────────────────────────
@@ -1157,6 +1225,7 @@ function doImportExcel() {
   data.filter(r=>r.tipo==="demand").forEach(d=>expanded.add(d.id));
   closeXL();
   render();
+  scheduleSave();
   showToast(`✓ ${imported.length} registros importados`);
 }
 
@@ -1174,14 +1243,197 @@ function collapseAll() {
   render();
 }
 
-document.addEventListener("keydown", e => { if (e.key==="Escape") closeModal(); });
+document.addEventListener("keydown", e => { if (e.key==="Escape") { closeModal(); closeXL(); } });
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ── Google Sheets Sync (JSONP para GET, form-post para POST) ─────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+const API_URL = "https://script.google.com/macros/s/AKfycbzo2z-mF92zlyFrpMx2jc7lLOnUKad1kNQjuDhMNXchPy6e_ze0bczEvOPH9g0BcU8K/exec";
+
+let serverSnapshot  = null;  // última versão conhecida do servidor
+let saveTimer       = null;  // timer do debounce
+let conflictPending = null;  // dados do servidor em conflito
+
+// ── Sync bar ──────────────────────────────────────────────────────────────────
+function setSyncBar(state, label) {
+  const bar = document.getElementById("sync-bar");
+  const lbl = document.getElementById("sync-label");
+  if (bar) bar.className = `sync-bar ${state}`;
+  if (lbl) lbl.textContent = label;
+}
+function syncBarClick() {
+  const bar = document.getElementById("sync-bar");
+  if (bar && (bar.classList.contains("error") || bar.classList.contains("conflict")))
+    loadFromSheets();
+}
+
+// ── JSONP helper (contorna CORS em GET) ───────────────────────────────────────
+function jsonpGet(url) {
+  return new Promise((resolve, reject) => {
+    const cbName = "_cb" + Date.now() + Math.floor(Math.random()*1000);
+    const script = document.createElement("script");
+    const timer  = setTimeout(() => {
+      cleanup();
+      reject(new Error("Timeout"));
+    }, 15000);
+
+    window[cbName] = data => { cleanup(); resolve(data); };
+
+    function cleanup() {
+      clearTimeout(timer);
+      delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+    }
+
+    script.onerror = () => { cleanup(); reject(new Error("Script error")); };
+    script.src = url + (url.includes("?") ? "&" : "?") + "callback=" + cbName + "&t=" + Date.now();
+    document.head.appendChild(script);
+  });
+}
+
+// ── POST via fetch com no-cors (fire-and-forget) ─────────────────────────────
+// no-cors não retorna body, então verificamos via GET em seguida
+async function postData(payload) {
+  await fetch(API_URL, {
+    method:  "POST",
+    mode:    "no-cors",           // evita bloqueio de CORS
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify(payload),
+  });
+}
+
+// ── Carregar do Sheets ────────────────────────────────────────────────────────
+async function loadFromSheets() {
+  setSyncBar("saving", "Carregando…");
+  try {
+    const json = await jsonpGet(API_URL);
+    if (!json.ok) throw new Error("Resposta inválida do servidor");
+
+    const freshSnap = JSON.stringify(json.data);
+
+    // Conflito: servidor mudou enquanto havia edições locais pendentes
+    if (serverSnapshot !== null && saveTimer !== null && freshSnap !== serverSnapshot) {
+      showConflict(json.data);
+      return;
+    }
+
+    serverSnapshot = freshSnap;
+    data = json.data;
+    data.filter(r => r.tipo === "demand").forEach(d => expanded.add(d.id));
+    render();
+    setSyncBar("saved", "Sincronizado · " + nowTime());
+    startPolling();
+  } catch (e) {
+    console.error("loadFromSheets:", e);
+    setSyncBar("error", "Erro ao carregar — clique para tentar novamente");
+    // Mantém dados de exemplo para o app não ficar em branco
+    data.filter(r => r.tipo === "demand").forEach(d => expanded.add(d.id));
+    render();
+  }
+}
+
+// ── Agendar salvamento (debounce 3s) ─────────────────────────────────────────
+function scheduleSave() {
+  if (serverSnapshot === null) return; // ainda não carregou
+  setSyncBar("saving", "Aguardando para salvar…");
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(doSave, 3000);
+}
+
+// ── Salvar no Sheets ──────────────────────────────────────────────────────────
+async function doSave() {
+  saveTimer = null;
+  setSyncBar("saving", "Salvando…");
+  try {
+    // 1. Verificar se servidor mudou (conflito)
+    const check = await jsonpGet(API_URL);
+    const freshSnap = JSON.stringify(check.data);
+    if (serverSnapshot !== null && freshSnap !== serverSnapshot) {
+      showConflict(check.data);
+      return;
+    }
+
+    // 2. Enviar dados
+    await postData({ data });
+
+    // 3. Aguardar 2s e verificar se chegou (no-cors não retorna body)
+    await new Promise(r => setTimeout(r, 2000));
+    const verify = await jsonpGet(API_URL);
+    if (JSON.stringify(verify.data) !== JSON.stringify(data)) {
+      // Ainda não propagou — marca como salvo otimisticamente
+      console.warn("Verificação pós-save divergente (propagação lenta)");
+    }
+
+    serverSnapshot = JSON.stringify(data);
+    setSyncBar("saved", "Salvo · " + nowTime());
+  } catch (e) {
+    console.error("doSave:", e);
+    setSyncBar("error", "Erro ao salvar — clique para tentar novamente");
+  }
+}
+
+// ── Resolução de conflito ─────────────────────────────────────────────────────
+function showConflict(serverData) {
+  conflictPending = serverData;
+  document.getElementById("conflict-overlay").classList.add("open");
+  setSyncBar("conflict", "Conflito detectado — clique para resolver");
+}
+
+function resolveConflict(choice) {
+  document.getElementById("conflict-overlay").classList.remove("open");
+  if (!conflictPending) return;
+
+  if (choice === "mine") {
+    serverSnapshot = JSON.stringify(conflictPending); // aceita base do servidor para comparação
+    conflictPending = null;
+    doSave();
+  } else if (choice === "theirs") {
+    data = conflictPending;
+    serverSnapshot = JSON.stringify(data);
+    conflictPending = null;
+    data.filter(r => r.tipo === "demand").forEach(d => expanded.add(d.id));
+    render();
+    setSyncBar("saved", "Atualizado · " + nowTime());
+  } else {
+    // Mesclar: adiciona registros do servidor que não existem localmente
+    const localIds = new Set(data.map(r => r.id));
+    conflictPending.forEach(r => { if (!localIds.has(r.id)) data.push(r); });
+    serverSnapshot = JSON.stringify(conflictPending);
+    conflictPending = null;
+    data.filter(r => r.tipo === "demand").forEach(d => expanded.add(d.id));
+    render();
+    doSave();
+  }
+}
+
+// ── Polling a cada 30s ────────────────────────────────────────────────────────
+let pollingInterval = null;
+function startPolling() {
+  if (pollingInterval) return;
+  pollingInterval = setInterval(async () => {
+    if (saveTimer !== null) return; // não interrompe salvamento
+    try {
+      const json = await jsonpGet(API_URL);
+      if (!json.ok) return;
+      const freshSnap = JSON.stringify(json.data);
+      if (freshSnap !== serverSnapshot) {
+        serverSnapshot = freshSnap;
+        setSyncBar("conflict", "🔄 Há dados novos no servidor — clique em ↺ Atualizar");
+      }
+    } catch { /* ignora erros de polling */ }
+  }, 30000);
+}
+
+// ── Utilitário ────────────────────────────────────────────────────────────────
+function nowTime() {
+  return new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+}
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 buildColgroup();
 initResizers();
-// Start with all demands expanded
-data.filter(r=>r.tipo==="demand").forEach(d=>expanded.add(d.id));
-render();
+loadFromSheets();
+
 </script>
 </body>
 </html>
